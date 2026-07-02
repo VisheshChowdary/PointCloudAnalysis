@@ -5,21 +5,6 @@ from data.off_parser import OFFParser
 
 
 class ModelNet40Dataset(Dataset):
-    """
-    PyTorch Dataset for ModelNet40.
-
-    Expected folder structure:
-
-    datasets/
-        ModelNet40/
-            airplane/
-                train/
-                test/
-            chair/
-                train/
-                test/
-            ...
-    """
 
     def __init__(
         self,
@@ -29,22 +14,32 @@ class ModelNet40Dataset(Dataset):
         transform=None
     ):
 
-        self.root_dir = Path(root_dir)
-        self.split = split
         self.transform = transform
-
+        self.split = split
         self.parser = OFFParser(num_points)
+
+        self.root_dir = Path(root_dir)
+
+        print("\n==============================")
+        print("Initializing ModelNet40Dataset")
+        print("==============================")
+        print("Root Directory :", self.root_dir)
+
+        print("Exists :", self.root_dir.exists())
+        print("Is Directory :", self.root_dir.is_dir())
 
         if not self.root_dir.exists():
             raise FileNotFoundError(
                 f"Dataset directory not found:\n{self.root_dir}"
             )
 
-        self.classes = sorted(
+        self.classes = sorted([
             folder.name
             for folder in self.root_dir.iterdir()
             if folder.is_dir()
-        )
+        ])
+
+        print(f"Number of classes found : {len(self.classes)}")
 
         self.class_to_idx = {
             cls: idx
@@ -55,13 +50,17 @@ class ModelNet40Dataset(Dataset):
 
         for cls in self.classes:
 
-            folder = self.root_dir / cls / split
+            class_folder = self.root_dir / cls / split
 
-            if not folder.exists():
+            if not class_folder.exists():
+                print(f"Skipping missing folder : {class_folder}")
                 continue
 
-            for file in sorted(folder.glob("*.off")):
+            files = list(class_folder.glob("*.off"))
 
+            print(f"{cls:<15} -> {len(files)} files")
+
+            for file in files:
                 self.samples.append(
                     (
                         file,
@@ -69,16 +68,10 @@ class ModelNet40Dataset(Dataset):
                     )
                 )
 
-        print("=" * 60)
-        print("ModelNet40 Dataset Loaded")
-        print("=" * 60)
-        print(f"Split      : {self.split}")
-        print(f"Classes    : {len(self.classes)}")
-        print(f"Samples    : {len(self.samples)}")
-        print("=" * 60)
+        print("\nTotal Samples :", len(self.samples))
+        print("==============================\n")
 
     def __len__(self):
-
         return len(self.samples)
 
     def __getitem__(self, index):
