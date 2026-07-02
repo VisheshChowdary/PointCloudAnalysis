@@ -12,6 +12,4 @@ class Accuracy:
 
         correct = (predictions == labels).sum().item()
 
-        total = labels.size(0)
-
-        return correct / total
+        return correct / labels.size(0)

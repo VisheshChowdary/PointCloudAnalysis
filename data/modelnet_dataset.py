@@ -12,24 +12,19 @@ class ModelNet40Dataset(Dataset):
         root_dir,
         split="train",
         num_points=2048,
-        transform=None
+        transform=None,
     ):
 
-        self.transform = transform
-        self.split = split
-        self.parser = OFFParser(num_points)
-
         self.root_dir = Path(root_dir).expanduser().resolve()
-
-        print("\n==============================")
-        print("Initializing ModelNet40Dataset")
-        print("==============================")
-        print("Root Directory :", self.root_dir)
 
         if not self.root_dir.exists():
             raise FileNotFoundError(
                 f"Dataset directory not found:\n{self.root_dir}"
             )
+
+        self.transform = transform
+        self.parser = OFFParser(num_points)
+        self.split = split
 
         self.classes = sorted(
             folder.name
@@ -38,8 +33,6 @@ class ModelNet40Dataset(Dataset):
             and (folder / "train").exists()
             and (folder / "test").exists()
         )
-
-        print(f"Classes Found : {len(self.classes)}")
 
         self.class_to_idx = {
             cls: idx
@@ -54,30 +47,35 @@ class ModelNet40Dataset(Dataset):
 
             files = sorted(folder.glob("*.off"))
 
-            print(f"{cls:<15} {len(files)}")
-
             for file in files:
+
                 self.samples.append(
                     (
                         file,
-                        self.class_to_idx[cls]
+                        self.class_to_idx[cls],
                     )
                 )
 
-        print("\nTotal Samples :", len(self.samples))
-        print("==============================")
+        print("=" * 60)
+        print("ModelNet40 Dataset")
+        print("=" * 60)
+        print("Split      :", split)
+        print("Classes    :", len(self.classes))
+        print("Samples    :", len(self.samples))
+        print("=" * 60)
 
     def __len__(self):
 
         return len(self.samples)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, index):
 
-        file_path, label = self.samples[idx]
+        file_path, label = self.samples[index]
 
         points = self.parser.load(file_path)
 
         if self.transform is not None:
+
             points = self.transform(points)
 
         return points, label

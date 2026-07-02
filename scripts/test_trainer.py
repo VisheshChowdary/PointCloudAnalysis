@@ -14,7 +14,8 @@ def main():
     try:
 
         print("=" * 60)
-        print("STEP 1 : Selecting Device")
+        print("PointCloudAnalysis - Phase 1")
+        print("=" * 60)
 
         device = torch.device(
             "cuda"
@@ -24,15 +25,8 @@ def main():
             else "cpu"
         )
 
-        print("Device :", device)
-
-        print("=" * 60)
-        print("STEP 2 : Dataset")
-
-        print(DATASET_ROOT)
-
-        print("=" * 60)
-        print("STEP 3 : DataLoader")
+        print(f"Device : {device}")
+        print(f"Dataset: {DATASET_ROOT}")
 
         train_loader = create_dataloader(
             root_dir=DATASET_ROOT,
@@ -43,31 +37,18 @@ def main():
             num_workers=cfg.training.num_workers
         )
 
-        print("=" * 60)
-        print("STEP 4 : Model")
-
         model = DummyModel(
             num_points=cfg.dataset.num_points,
             num_classes=cfg.dataset.num_classes
         ).to(device)
 
-        print(model)
-
-        print("=" * 60)
-        print("STEP 5 : Optimizer")
-
         optimizer = torch.optim.Adam(
             model.parameters(),
-            lr=cfg.training.learning_rate
+            lr=cfg.training.learning_rate,
+            weight_decay=cfg.training.weight_decay
         )
 
-        print("=" * 60)
-        print("STEP 6 : Loss")
-
         criterion = nn.CrossEntropyLoss()
-
-        print("=" * 60)
-        print("STEP 7 : Trainer")
 
         trainer = Trainer(
             model=model,
@@ -77,15 +58,15 @@ def main():
             checkpoint_dir=cfg.checkpoint.directory
         )
 
-        print("=" * 60)
-        print("STEP 8 : Training")
+        print("\nStarting Training...\n")
 
         loss, acc = trainer.train_one_epoch(train_loader)
 
         print("=" * 60)
-
+        print("Training Finished")
         print(f"Loss     : {loss:.4f}")
         print(f"Accuracy : {acc:.4f}")
+        print("=" * 60)
 
         trainer.save(epoch=1, loss=loss)
 
