@@ -4,8 +4,8 @@ import torch
 
 class Normalize:
     """
-    Center the point cloud at the origin and scale it to fit inside
-    the unit sphere.
+    Center the point cloud at the origin and scale it
+    to fit inside the unit sphere.
     """
 
     def __call__(self, points):
@@ -16,14 +16,15 @@ class Normalize:
 
         max_distance = np.max(np.linalg.norm(points, axis=1))
 
-        points = points / max_distance
+        if max_distance > 0:
+            points = points / max_distance
 
         return points.astype(np.float32)
 
 
 class RandomRotate:
     """
-    Rotate around the Y-axis.
+    Random rotation about the Y-axis.
     """
 
     def __call__(self, points):
@@ -37,14 +38,14 @@ class RandomRotate:
             [cos_theta, 0, sin_theta],
             [0, 1, 0],
             [-sin_theta, 0, cos_theta]
-        ])
+        ], dtype=np.float32)
 
-        return points @ rotation.T
+        return (points @ rotation.T).astype(np.float32)
 
 
 class RandomJitter:
     """
-    Add Gaussian noise.
+    Add Gaussian noise to each point.
     """
 
     def __init__(self, sigma=0.01, clip=0.02):
@@ -60,10 +61,13 @@ class RandomJitter:
             self.clip
         )
 
-        return points + noise
+        return (points + noise).astype(np.float32)
 
 
 class ToTensor:
+    """
+    Convert NumPy array to PyTorch tensor.
+    """
 
     def __call__(self, points):
 
@@ -71,6 +75,9 @@ class ToTensor:
 
 
 class Compose:
+    """
+    Apply transforms sequentially.
+    """
 
     def __init__(self, transforms):
 

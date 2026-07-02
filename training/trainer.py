@@ -5,6 +5,9 @@ from utils.checkpoint import CheckpointManager
 
 
 class Trainer:
+    """
+    Handles training, validation and checkpointing.
+    """
 
     def __init__(
         self,
@@ -25,10 +28,6 @@ class Trainer:
 
     def train_one_epoch(self, loader):
 
-        print("\n==============================")
-        print("Entered train_one_epoch()")
-        print("==============================")
-
         self.model.train()
 
         total_loss = 0.0
@@ -36,72 +35,31 @@ class Trainer:
 
         for batch_idx, (points, labels) in enumerate(loader):
 
-            print(f"\n---------- Batch {batch_idx} ----------")
-
-            print("1. Batch Loaded")
-
-            print("Points Shape :", points.shape)
-            print("Labels Shape :", labels.shape)
-
-            print("2. Moving to Device")
-
             points = points.to(self.device)
             labels = labels.to(self.device)
 
-            print("✓ Data moved to", self.device)
-
-            print("3. Zero Grad")
-
             self.optimizer.zero_grad()
-
-            print("✓ Zero Grad Done")
-
-            print("4. Forward Pass")
 
             outputs = self.model(points)
 
-            print("✓ Forward Pass Complete")
-
-            print("Output Shape :", outputs.shape)
-
-            print("5. Computing Loss")
-
             loss = self.criterion(outputs, labels)
-
-            print("✓ Loss :", loss.item())
-
-            print("6. Backward Pass")
 
             loss.backward()
 
-            print("✓ Backward Complete")
-
-            print("7. Optimizer Step")
-
             self.optimizer.step()
 
-            print("✓ Optimizer Step Complete")
-
             acc = self.metric(outputs, labels)
-
-            print("Accuracy :", acc)
 
             total_loss += loss.item()
             total_acc += acc
 
-            print("✓ Batch Finished")
+        avg_loss = total_loss / len(loader)
+        avg_acc = total_acc / len(loader)
 
-            # Debug only one batch
-            break
-
-        print("\nTraining Loop Finished")
-
-        return total_loss, total_acc
+        return avg_loss, avg_acc
 
     @torch.no_grad()
     def validate(self, loader):
-
-        print("\nValidation Started")
 
         self.model.eval()
 
@@ -122,18 +80,16 @@ class Trainer:
             total_loss += loss.item()
             total_acc += acc
 
-            break
+        avg_loss = total_loss / len(loader)
+        avg_acc = total_acc / len(loader)
 
-        return total_loss, total_acc
+        return avg_loss, avg_acc
 
-    def save(self, epoch):
-
-        print("\nSaving Checkpoint...")
+    def save(self, epoch, loss=None):
 
         self.checkpoint.save(
-            self.model,
-            self.optimizer,
-            epoch
+            model=self.model,
+            optimizer=self.optimizer,
+            epoch=epoch,
+            loss=loss
         )
-
-        print("Checkpoint Saved")

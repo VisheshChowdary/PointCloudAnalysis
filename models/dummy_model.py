@@ -2,6 +2,16 @@ import torch.nn as nn
 
 
 class DummyModel(nn.Module):
+    """
+    Simple neural network used to verify that the
+    complete training pipeline works correctly.
+
+    Input:
+        (B, 2048, 3)
+
+    Output:
+        (B, 40)
+    """
 
     def __init__(self):
 

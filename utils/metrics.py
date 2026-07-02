@@ -2,6 +2,9 @@ import torch
 
 
 class Accuracy:
+    """
+    Computes classification accuracy.
+    """
 
     def __call__(self, outputs, labels):
 
@@ -9,4 +12,6 @@ class Accuracy:
 
         correct = (predictions == labels).sum().item()
 
-        return correct / labels.size(0)
+        total = labels.size(0)
+
+        return correct / total
