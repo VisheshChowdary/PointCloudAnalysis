@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import torch
 
 
@@ -28,16 +29,30 @@ class CheckpointManager:
         print("=" * 60)
         print("Checkpoint Saved")
         print(f"Epoch : {epoch}")
-        print(f"Path  : {path}")
+        print(f"Path  : {path.resolve()}")
         print("=" * 60)
 
-    def load(self, path, model, optimizer=None):
+    def load(self, path, model, optimizer=None, device="cpu"):
 
-        checkpoint = torch.load(path, map_location="cpu")
+        path = Path(path)
 
-        model.load_state_dict(checkpoint["model_state_dict"])
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Checkpoint not found:\n{path}"
+            )
+
+        checkpoint = torch.load(
+            path,
+            map_location=device,
+            weights_only=False
+        )
+
+        model.load_state_dict(
+            checkpoint["model_state_dict"]
+        )
 
         if optimizer is not None:
+
             optimizer.load_state_dict(
                 checkpoint["optimizer_state_dict"]
             )
@@ -45,6 +60,13 @@ class CheckpointManager:
         print("=" * 60)
         print("Checkpoint Loaded")
         print(f"Epoch : {checkpoint['epoch']}")
+
+        if checkpoint["loss"] is not None:
+            print(f"Loss  : {checkpoint['loss']:.4f}")
+
         print("=" * 60)
 
-        return checkpoint["epoch"]
+        return (
+            checkpoint["epoch"],
+            checkpoint.get("loss", None)
+        )
