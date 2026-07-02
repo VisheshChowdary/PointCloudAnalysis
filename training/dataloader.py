@@ -1,68 +1,82 @@
+import torch
+
 from torch.utils.data import DataLoader
 
+from configs import cfg
 from data.modelnet_dataset import ModelNet40Dataset
 from data.transforms import (
     Compose,
     Normalize,
     RandomRotate,
     RandomJitter,
-    ToTensor
+    ToTensor,
 )
 
 
 def create_dataloader(
     root_dir,
     split="train",
-    batch_size=32,
-    num_points=2048,
+    batch_size=None,
+    num_points=None,
     shuffle=None,
-    num_workers=0
+    num_workers=None,
 ):
-    """
-    Creates a PyTorch DataLoader for ModelNet40.
-    """
+
+    if batch_size is None:
+        batch_size = cfg.training.batch_size
+
+    if num_points is None:
+        num_points = cfg.dataset.num_points
+
+    if num_workers is None:
+        num_workers = cfg.training.num_workers
 
     if shuffle is None:
-        shuffle = (split == "train")
+        shuffle = split == "train"
 
     if split == "train":
-        transform = Compose([
-            Normalize(),
-            RandomRotate(),
-            RandomJitter(),
-            ToTensor()
-        ])
+
+        transform = Compose(
+            [
+                Normalize(),
+                RandomRotate(),
+                RandomJitter(),
+                ToTensor(),
+            ]
+        )
+
     else:
-        transform = Compose([
-            Normalize(),
-            ToTensor()
-        ])
+
+        transform = Compose(
+            [
+                Normalize(),
+                ToTensor(),
+            ]
+        )
 
     dataset = ModelNet40Dataset(
         root_dir=root_dir,
         split=split,
         num_points=num_points,
-        transform=transform
+        transform=transform,
     )
 
     loader = DataLoader(
-        dataset=dataset,
+        dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
-        pin_memory=True,
-        drop_last=False
+        pin_memory=torch.cuda.is_available(),
+        persistent_workers=num_workers > 0,
+        drop_last=False,
     )
 
     print("=" * 60)
-    print("DataLoader Created")
+    print("DataLoader")
     print("=" * 60)
-    print(f"Root Directory : {root_dir}")
-    print(f"Split          : {split}")
-    print(f"Batch Size     : {batch_size}")
-    print(f"Num Points     : {num_points}")
-    print(f"Samples        : {len(dataset)}")
-    print(f"Batches        : {len(loader)}")
+    print("Batch Size :", batch_size)
+    print("Workers    :", num_workers)
+    print("Batches    :", len(loader))
     print("=" * 60)
 
     return loader
