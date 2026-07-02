@@ -20,7 +20,7 @@ def main():
         print("STEP 2 : Creating DataLoader")
 
         train_loader = create_dataloader(
-            root_dir="datasets/ModelNet40",
+            root_dir="/kaggle/input/modelnet40-princeton-3d-object-dataset/ModelNet40",
             split="train",
             batch_size=8
         )
