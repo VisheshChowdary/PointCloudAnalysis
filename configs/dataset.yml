@@ -1,0 +1,9 @@
+dataset: ModelNet40
+
+num_points: 2048
+
+num_classes: 40
+
+train_split: train
+
+test_split: test

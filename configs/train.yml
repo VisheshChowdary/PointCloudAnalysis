@@ -1,0 +1,13 @@
+epochs: 100
+
+batch_size: 32
+
+learning_rate: 0.001
+
+weight_decay: 0.0001
+
+optimizer: adam
+
+scheduler: cosine
+
+save_every: 10

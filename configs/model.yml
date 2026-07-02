@@ -1,0 +1,5 @@
+model: PointNet
+
+dropout: 0.3
+
+feature_transform: true
