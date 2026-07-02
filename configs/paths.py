@@ -15,6 +15,7 @@ def find_modelnet40():
     ]
 
     for path in candidates:
+
         if path.exists():
             return str(path)
 
@@ -29,7 +30,10 @@ def find_modelnet40():
 
             try:
 
-                children = [x for x in folder.iterdir() if x.is_dir()]
+                children = [
+                    x for x in folder.iterdir()
+                    if x.is_dir()
+                ]
 
                 if len(children) >= 40:
                     return str(folder)
@@ -37,7 +41,9 @@ def find_modelnet40():
             except Exception:
                 pass
 
-    raise FileNotFoundError("Unable to locate ModelNet40 dataset.")
+    raise FileNotFoundError(
+        "Unable to locate ModelNet40 dataset."
+    )
 
 
 DATASET_ROOT = find_modelnet40()

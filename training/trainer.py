@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 
 from utils.metrics import Accuracy
@@ -5,9 +7,6 @@ from utils.checkpoint import CheckpointManager
 
 
 class Trainer:
-    """
-    Handles training, validation and checkpointing.
-    """
 
     def __init__(
         self,
@@ -23,6 +22,9 @@ class Trainer:
         self.criterion = criterion
         self.device = device
 
+        checkpoint_dir = Path(checkpoint_dir)
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
         self.metric = Accuracy()
         self.checkpoint = CheckpointManager(checkpoint_dir)
 
@@ -33,10 +35,13 @@ class Trainer:
         total_loss = 0.0
         total_acc = 0.0
 
-        for batch_idx, (points, labels) in enumerate(loader):
+        if len(loader) == 0:
+            raise RuntimeError("Training DataLoader is empty.")
 
-            points = points.to(self.device)
-            labels = labels.to(self.device)
+        for points, labels in loader:
+
+            points = points.to(self.device, non_blocking=True)
+            labels = labels.to(self.device, non_blocking=True)
 
             self.optimizer.zero_grad()
 
@@ -53,10 +58,10 @@ class Trainer:
             total_loss += loss.item()
             total_acc += acc
 
-        avg_loss = total_loss / len(loader)
-        avg_acc = total_acc / len(loader)
-
-        return avg_loss, avg_acc
+        return (
+            total_loss / len(loader),
+            total_acc / len(loader)
+        )
 
     @torch.no_grad()
     def validate(self, loader):
@@ -66,10 +71,13 @@ class Trainer:
         total_loss = 0.0
         total_acc = 0.0
 
+        if len(loader) == 0:
+            raise RuntimeError("Validation DataLoader is empty.")
+
         for points, labels in loader:
 
-            points = points.to(self.device)
-            labels = labels.to(self.device)
+            points = points.to(self.device, non_blocking=True)
+            labels = labels.to(self.device, non_blocking=True)
 
             outputs = self.model(points)
 
@@ -80,10 +88,10 @@ class Trainer:
             total_loss += loss.item()
             total_acc += acc
 
-        avg_loss = total_loss / len(loader)
-        avg_acc = total_acc / len(loader)
-
-        return avg_loss, avg_acc
+        return (
+            total_loss / len(loader),
+            total_acc / len(loader)
+        )
 
     def save(self, epoch, loss=None):
 

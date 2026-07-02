@@ -1,68 +1,101 @@
+import traceback
+
 import torch
+import torch.nn as nn
 
-from torch.utils.data import DataLoader
-
-from data.modelnet_dataset import ModelNet40Dataset
-from data.transforms import (
-    Compose,
-    Normalize,
-    RandomRotate,
-    RandomJitter,
-    ToTensor
-)
+from configs import cfg, DATASET_ROOT
+from training.dataloader import create_dataloader
+from training.trainer import Trainer
+from models.dummy_model import DummyModel
 
 
-def create_dataloader(
-    root_dir,
-    split="train",
-    batch_size=32,
-    num_points=2048,
-    shuffle=None,
-    num_workers=0
-):
+def main():
 
-    if shuffle is None:
-        shuffle = split == "train"
+    try:
 
-    if split == "train":
+        print("=" * 60)
+        print("STEP 1 : Selecting Device")
 
-        transform = Compose([
-            Normalize(),
-            RandomRotate(),
-            RandomJitter(),
-            ToTensor()
-        ])
+        device = torch.device(
+            "cuda"
+            if torch.cuda.is_available()
+            else "mps"
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+            else "cpu"
+        )
 
-    else:
+        print("Device :", device)
 
-        transform = Compose([
-            Normalize(),
-            ToTensor()
-        ])
+        print("=" * 60)
+        print("STEP 2 : Dataset")
 
-    dataset = ModelNet40Dataset(
-        root_dir=root_dir,
-        split=split,
-        num_points=num_points,
-        transform=transform
-    )
+        print(DATASET_ROOT)
 
-    loader = DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        pin_memory=torch.cuda.is_available(),
-        drop_last=False
-    )
+        print("=" * 60)
+        print("STEP 3 : DataLoader")
 
-    print("=" * 60)
-    print("DataLoader Created")
-    print("=" * 60)
-    print("Split      :", split)
-    print("Batch Size :", batch_size)
-    print("Samples    :", len(dataset))
-    print("Batches    :", len(loader))
-    print("=" * 60)
+        train_loader = create_dataloader(
+            root_dir=DATASET_ROOT,
+            split="train",
+            batch_size=cfg.training.batch_size,
+            num_points=cfg.dataset.num_points,
+            shuffle=cfg.training.shuffle,
+            num_workers=cfg.training.num_workers
+        )
 
-    return loader
+        print("=" * 60)
+        print("STEP 4 : Model")
+
+        model = DummyModel(
+            num_points=cfg.dataset.num_points,
+            num_classes=cfg.dataset.num_classes
+        ).to(device)
+
+        print(model)
+
+        print("=" * 60)
+        print("STEP 5 : Optimizer")
+
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=cfg.training.learning_rate
+        )
+
+        print("=" * 60)
+        print("STEP 6 : Loss")
+
+        criterion = nn.CrossEntropyLoss()
+
+        print("=" * 60)
+        print("STEP 7 : Trainer")
+
+        trainer = Trainer(
+            model=model,
+            optimizer=optimizer,
+            criterion=criterion,
+            device=device,
+            checkpoint_dir=cfg.checkpoint.directory
+        )
+
+        print("=" * 60)
+        print("STEP 8 : Training")
+
+        loss, acc = trainer.train_one_epoch(train_loader)
+
+        print("=" * 60)
+
+        print(f"Loss     : {loss:.4f}")
+        print(f"Accuracy : {acc:.4f}")
+
+        trainer.save(epoch=1, loss=loss)
+
+        print("\n✓ Phase 1 Completed Successfully")
+
+    except Exception:
+
+        print("\nERROR OCCURRED\n")
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()

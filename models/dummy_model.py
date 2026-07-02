@@ -1,32 +1,32 @@
+import torch
 import torch.nn as nn
 
 
 class DummyModel(nn.Module):
-    """
-    Simple neural network used to verify that the
-    complete training pipeline works correctly.
 
-    Input:
-        (B, 2048, 3)
-
-    Output:
-        (B, 40)
-    """
-
-    def __init__(self):
+    def __init__(
+        self,
+        num_points=2048,
+        num_classes=40
+    ):
 
         super().__init__()
+
+        self.num_points = num_points
 
         self.network = nn.Sequential(
 
             nn.Flatten(),
 
-            nn.Linear(2048 * 3, 512),
+            nn.Linear(num_points * 3, 512),
 
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
 
-            nn.Linear(512, 40)
+            nn.Linear(512, 256),
 
+            nn.ReLU(inplace=True),
+
+            nn.Linear(256, num_classes)
         )
 
     def forward(self, x):
