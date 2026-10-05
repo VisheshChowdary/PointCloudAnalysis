@@ -9,13 +9,18 @@ class Trainer:
     """
     Training, validation and checkpoint management.
 
-    Supports PointNet models that return:
+    Supports:
 
-        outputs
-        input_transform
-        feature_transform
+    1. Ordinary classification models returning:
+           outputs
 
-    as well as ordinary models that return only outputs.
+    2. PointNet models returning:
+           outputs,
+           input_transform,
+           feature_transform
+
+    PointNet feature-transform regularization is automatically
+    applied when a feature transform is returned.
     """
 
     def __init__(
@@ -43,20 +48,34 @@ class Trainer:
             feature_transform_weight
         )
 
+    # ==========================================================
+    # FORWARD PASS
+    # ==========================================================
+
     def _forward(self, points):
         """
-        Handles both normal classifiers and PointNet.
+        Performs model forward pass.
+
+        Handles both:
+
+        Ordinary models:
+            outputs
+
+        PointNet:
+            outputs,
+            input_transform,
+            feature_transform
         """
 
         result = self.model(points)
 
+        # ------------------------------------------------------
+        # PointNet / tuple output
+        # ------------------------------------------------------
+
         if isinstance(result, tuple):
 
             outputs = result[0]
-
-            # PointNet convention:
-            # result[1] = input transform
-            # result[2] = feature transform
 
             input_transform = (
                 result[1]
@@ -76,7 +95,15 @@ class Trainer:
                 feature_transform
             )
 
+        # ------------------------------------------------------
+        # Normal model output
+        # ------------------------------------------------------
+
         return result, None, None
+
+    # ==========================================================
+    # TRAIN ONE EPOCH
+    # ==========================================================
 
     def train_one_epoch(self, loader):
 
@@ -91,6 +118,10 @@ class Trainer:
 
         for batch_idx, (points, labels) in enumerate(loader):
 
+            # --------------------------------------------------
+            # Move data to device
+            # --------------------------------------------------
+
             points = points.to(
                 self.device,
                 non_blocking=True
@@ -101,9 +132,17 @@ class Trainer:
                 non_blocking=True
             )
 
+            # --------------------------------------------------
+            # Clear gradients
+            # --------------------------------------------------
+
             self.optimizer.zero_grad(
                 set_to_none=True
             )
+
+            # --------------------------------------------------
+            # Forward pass
+            # --------------------------------------------------
 
             (
                 outputs,
@@ -111,10 +150,18 @@ class Trainer:
                 feature_transform
             ) = self._forward(points)
 
+            # --------------------------------------------------
+            # Classification loss
+            # --------------------------------------------------
+
             classification_loss = self.criterion(
                 outputs,
                 labels
             )
+
+            # --------------------------------------------------
+            # PointNet feature-transform regularization
+            # --------------------------------------------------
 
             if feature_transform is not None:
 
@@ -129,6 +176,10 @@ class Trainer:
                     device=self.device
                 )
 
+            # --------------------------------------------------
+            # Total loss
+            # --------------------------------------------------
+
             loss = (
                 classification_loss
                 +
@@ -136,9 +187,17 @@ class Trainer:
                 * reg_loss
             )
 
+            # --------------------------------------------------
+            # Backpropagation
+            # --------------------------------------------------
+
             loss.backward()
 
             self.optimizer.step()
+
+            # --------------------------------------------------
+            # Predictions
+            # --------------------------------------------------
 
             predictions = outputs.argmax(
                 dim=1
@@ -150,14 +209,33 @@ class Trainer:
 
             batch_size = labels.size(0)
 
+            # --------------------------------------------------
+            # Accumulate statistics
+            # --------------------------------------------------
+
             total_correct += correct
             total_samples += batch_size
 
-            total_loss += loss.item()
+            # Weight loss by batch size so that the final
+            # average is a true sample-weighted average.
+
+            total_loss += (
+                loss.item() * batch_size
+            )
+
             total_cls_loss += (
                 classification_loss.item()
+                * batch_size
             )
-            total_reg_loss += reg_loss.item()
+
+            total_reg_loss += (
+                reg_loss.item()
+                * batch_size
+            )
+
+            # --------------------------------------------------
+            # Periodic progress
+            # --------------------------------------------------
 
             if (
                 batch_idx + 1
@@ -175,41 +253,73 @@ class Trainer:
                     f"Acc: {batch_acc:.4f}"
                 )
 
-        num_batches = len(loader)
+        # ======================================================
+        # Epoch statistics
+        # ======================================================
+
+        if total_samples == 0:
+
+            raise RuntimeError(
+                "Training loader contains no samples."
+            )
 
         avg_loss = (
-            total_loss / num_batches
+            total_loss / total_samples
         )
 
         avg_cls_loss = (
-            total_cls_loss / num_batches
+            total_cls_loss / total_samples
         )
 
         avg_reg_loss = (
-            total_reg_loss / num_batches
+            total_reg_loss / total_samples
         )
 
         avg_acc = (
             total_correct / total_samples
         )
 
-        print("\nTraining Summary")
-        print("-" * 60)
+        # ======================================================
+        # Training summary
+        # ======================================================
+
+        print()
+        print("=" * 60)
+        print("TRAINING SUMMARY")
+        print("=" * 60)
+
         print(
-            f"Total Loss          : {avg_loss:.4f}"
+            f"Total Loss         : "
+            f"{avg_loss:.4f}"
         )
+
         print(
-            f"Classification Loss  : {avg_cls_loss:.4f}"
+            f"Classification Loss : "
+            f"{avg_cls_loss:.4f}"
         )
+
         print(
-            f"Regularization Loss  : {avg_reg_loss:.6f}"
+            f"Regularization Loss : "
+            f"{avg_reg_loss:.6f}"
         )
+
         print(
-            f"Accuracy             : {avg_acc:.4f}"
+            f"Accuracy            : "
+            f"{avg_acc:.4f}"
         )
-        print("-" * 60)
+
+        print(
+            f"Samples             : "
+            f"{total_samples}"
+        )
+
+        print("=" * 60)
 
         return avg_loss, avg_acc
+
+    # ==========================================================
+    # VALIDATION
+    # ==========================================================
 
     @torch.no_grad()
     def validate(self, loader):
@@ -217,10 +327,17 @@ class Trainer:
         self.model.eval()
 
         total_loss = 0.0
+        total_cls_loss = 0.0
+        total_reg_loss = 0.0
+
         total_correct = 0
         total_samples = 0
 
         for points, labels in loader:
+
+            # --------------------------------------------------
+            # Move data to device
+            # --------------------------------------------------
 
             points = points.to(
                 self.device,
@@ -232,16 +349,28 @@ class Trainer:
                 non_blocking=True
             )
 
+            # --------------------------------------------------
+            # Forward pass
+            # --------------------------------------------------
+
             (
                 outputs,
                 input_transform,
                 feature_transform
             ) = self._forward(points)
 
+            # --------------------------------------------------
+            # Classification loss
+            # --------------------------------------------------
+
             classification_loss = self.criterion(
                 outputs,
                 labels
             )
+
+            # --------------------------------------------------
+            # Feature-transform regularization
+            # --------------------------------------------------
 
             if feature_transform is not None:
 
@@ -256,6 +385,10 @@ class Trainer:
                     device=self.device
                 )
 
+            # --------------------------------------------------
+            # Total loss
+            # --------------------------------------------------
+
             loss = (
                 classification_loss
                 +
@@ -263,20 +396,61 @@ class Trainer:
                 * reg_loss
             )
 
+            # --------------------------------------------------
+            # Predictions
+            # --------------------------------------------------
+
             predictions = outputs.argmax(
                 dim=1
             )
 
-            total_correct += (
+            correct = (
                 predictions == labels
             ).sum().item()
 
-            total_samples += labels.size(0)
+            batch_size = labels.size(0)
 
-            total_loss += loss.item()
+            # --------------------------------------------------
+            # Accumulate
+            # --------------------------------------------------
+
+            total_correct += correct
+            total_samples += batch_size
+
+            total_loss += (
+                loss.item() * batch_size
+            )
+
+            total_cls_loss += (
+                classification_loss.item()
+                * batch_size
+            )
+
+            total_reg_loss += (
+                reg_loss.item()
+                * batch_size
+            )
+
+        # ======================================================
+        # Validation statistics
+        # ======================================================
+
+        if total_samples == 0:
+
+            raise RuntimeError(
+                "Validation loader contains no samples."
+            )
 
         avg_loss = (
-            total_loss / len(loader)
+            total_loss / total_samples
+        )
+
+        avg_cls_loss = (
+            total_cls_loss / total_samples
+        )
+
+        avg_reg_loss = (
+            total_reg_loss / total_samples
         )
 
         avg_acc = (
@@ -284,6 +458,10 @@ class Trainer:
         )
 
         return avg_loss, avg_acc
+
+    # ==========================================================
+    # CHECKPOINT
+    # ==========================================================
 
     def save(
         self,

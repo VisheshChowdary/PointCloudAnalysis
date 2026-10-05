@@ -3,17 +3,28 @@ import torch
 
 def feature_transform_regularizer(trans):
     """
-    Orthogonality regularization used by PointNet.
+    Computes the PointNet feature-transform regularization loss.
 
-    Encourages the learned feature transformation matrix
-    to remain close to an orthogonal matrix.
+    PointNet learns a feature transformation matrix T.
+    Ideally, T should be close to an orthogonal matrix:
+
+        T T^T ≈ I
+
+    Therefore, the regularization term is:
+
+        || T T^T - I ||_F
 
     Parameters
     ----------
     trans : torch.Tensor
-        Transformation matrices of shape:
+        Feature transformation matrices.
 
-        [B, K, K]
+        Expected shape:
+            [B, K, K]
+
+        where:
+            B = batch size
+            K = feature dimension
 
     Returns
     -------
@@ -24,29 +35,66 @@ def feature_transform_regularizer(trans):
     if trans is None:
         return torch.tensor(0.0)
 
-    k = trans.size(1)
+    # ----------------------------------------------------------
+    # Validate input
+    # ----------------------------------------------------------
+
+    if trans.dim() != 3:
+        raise ValueError(
+            "Expected transformation tensor with shape "
+            "[B, K, K], but received shape: "
+            f"{tuple(trans.shape)}"
+        )
+
+    batch_size = trans.size(0)
+    feature_dim = trans.size(1)
+
+    if trans.size(1) != trans.size(2):
+        raise ValueError(
+            "Transformation matrix must be square. "
+            f"Received shape: {tuple(trans.shape)}"
+        )
+
+    # ----------------------------------------------------------
+    # Create identity matrix
+    # ----------------------------------------------------------
 
     identity = torch.eye(
-        k,
+        feature_dim,
         device=trans.device,
         dtype=trans.dtype
-    ).unsqueeze(0)
+    )
 
-    identity = identity.expand(
-        trans.size(0),
+    identity = identity.unsqueeze(0).expand(
+        batch_size,
         -1,
         -1
     )
+
+    # ----------------------------------------------------------
+    # Compute T * T^T
+    # ----------------------------------------------------------
 
     product = torch.bmm(
         trans,
         trans.transpose(2, 1)
     )
 
-    diff = product - identity
+    # ----------------------------------------------------------
+    # Orthogonality error
+    #
+    # T T^T should be close to I
+    # ----------------------------------------------------------
 
-    loss = torch.mean(
-        torch.norm(diff, dim=(1, 2))
+    difference = product - identity
+
+    # Frobenius norm for each matrix
+    loss = torch.norm(
+        difference,
+        dim=(1, 2)
     )
+
+    # Average over batch
+    loss = loss.mean()
 
     return loss
